@@ -1,173 +1,169 @@
-import { useEffect, useState } from 'react'
-import { Bell, LayoutDashboard, User } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { TransactionForm } from '@/components/dashboard/TransactionForm'
-import { RecentTransactions } from '@/components/dashboard/RecentTransactions'
-import { SummaryCards } from '@/components/dashboard/SummaryCards'
-import { CategoryChart } from '@/components/dashboard/CategoryChart'
-import { useTransactions } from '@/hooks/useTransactions'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
+import { supabase } from './lib/supabase'
+import { Session } from '@supabase/supabase-js'
+import { Button } from './components/ui/button'
+import { useTransactions } from './hooks/useTransactions'
+import { SummaryCards } from './components/dashboard/SummaryCards'
+import { TransactionForm } from './components/dashboard/TransactionForm'
+import { CategoryChart } from './components/dashboard/CategoryChart'
+import { RecentTransactions } from './components/dashboard/RecentTransactions'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import { Separator } from './components/ui/separator'
+import { Loader2, LogOut, Wallet } from 'lucide-react'
 
 function App() {
-  const { transactions, addTransaction, deleteTransaction } = useTransactions()
-  const [userEmail, setUserEmail] = useState<string>("")
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const { transactions, loading: transactionsLoading, addTransaction, deleteTransaction } = useTransactions()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email) setUserEmail(data.user.email)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserEmail(session?.user?.email || "")
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
+  const handleLogin = async () => {
+    // For demo purposes, we'll try to sign in with a demo account or sign up
+    // In a real app, you'd have a proper auth form
+    const email = prompt("E-posta adresiniz:")
+    const password = prompt("Şifreniz:")
 
-  const thisMonthTransactions = transactions.filter(t => {
-    const d = new Date(t.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
+    if (email && password) {
+      const { error } = await supabase.auth.signInWithPassword({
+         email,
+         password
+      })
+      if (error) {
+        // Try sign up if sign in fails
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password
+        })
+        if (signUpError) alert(signUpError.message)
+        else alert("Kayıt olundu! Lütfen e-postanızı onaylayın veya giriş yapın (Supabase ayarlarınıza bağlı).")
+      }
+    }
+  }
 
-  const totalSpentThisMonth = thisMonthTransactions.reduce((acc, t) => acc + Number(t.amount), 0);
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
 
-  // Calculate percentage change (mock logic or real if we fetch last month)
-  // For MVP, letting it be simple or calculating if data exists
-  const lastMonthTransactions = transactions.filter(t => {
-    const d = new Date(t.date); // Simple check, handling month rollover logic is tedious in one line but essentially:
-    return (d.getMonth() === (currentMonth === 0 ? 11 : currentMonth - 1)) &&
-      (d.getFullYear() === (currentMonth === 0 ? currentYear - 1 : currentYear))
-  });
-  const totalSpentLastMonth = lastMonthTransactions.reduce((acc, t) => acc + Number(t.amount), 0);
+  // Calculate stats
+  const totalBalance = 25000 - transactions.reduce((acc, t) => acc + Number(t.amount), 0); // Mock starting balance
+  const monthlyExpense = transactions.reduce((acc, t) => acc + Number(t.amount), 0);
+  const savings = totalBalance * 0.15; // Mock savings calculation
 
-  // Calculate diff %
-  // Avoid division by zero
-  // 100 -> 120 (+20%)
-  // 0 -> 100 (+100% or infinite)
-  // 100 -> 50 (-50%)
-  let percentageChange = 0;
-  // Logic: ((Current - Last) / Last) * 100
-  // If Last is 0, and Current > 0, it's technically infinite increase, but let's show 100% or just amount.
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
-  // Top category
-  // Group by category, find max
-  const expensesByCategory: Record<string, number> = {};
-  thisMonthTransactions.forEach(t => {
-    expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + Number(t.amount);
-  });
-  const topCategoryEntry = Object.entries(expensesByCategory).sort((a, b) => b[1] - a[1])[0];
-  const topCategory = topCategoryEntry ? topCategoryEntry[0] : "-";
-
+  if (!session) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-gray-50">
+        <Card className="w-[350px]">
+          <CardHeader>
+            <CardTitle>Giriş Yap</CardTitle>
+            <CardDescription>Ev Harcama Dashboard'una erişmek için giriş yapın.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleLogin} className="w-full">Giriş Yap / Kayıt Ol</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
-      {/* Header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm">
-        <div className="flex items-center gap-2 font-semibold text-lg md:text-xl text-primary">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <LayoutDashboard className="h-5 w-5" />
-          </div>
-          Ev Harcama
-        </div>
-        <div className="ml-auto flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
-            <Bell className="h-5 w-5" />
-          </Button>
-          <Separator orientation="vertical" className="h-6" />
-          <Button variant="ghost" size="sm" className="gap-2">
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
-              <User className="h-4 w-4" />
+    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-primary rounded-lg">
+              <Wallet className="h-6 w-6 text-primary-foreground" />
             </div>
-            <span className="hidden md:inline-block font-medium">{userEmail || "Misafir"}</span>
-          </Button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="p-6 md:p-8 space-y-8 max-w-[1600px] mx-auto">
-
-        {/* Top Summary Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold tracking-tight">Genel Bakış</h2>
-            {!userEmail && (
-              <Button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}>Giriş Yap</Button>
-            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Harcama Takip</h1>
+              <p className="text-muted-foreground">Finansal durumunuzu kontrol altına alın.</p>
+            </div>
           </div>
-          <SummaryCards
-            monthlyExpense={totalSpentThisMonth}
-            totalBalance={0} // Not tracked
-            savings={0} // Not tracked
-          />
-        </section>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium hidden md:inline-block">{session.user.email}</span>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Çıkış
+            </Button>
+          </div>
+        </div>
 
-        {/* Main Grid: Form (Left) vs Charts/List (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <Separator />
 
-          {/* Left Column: Transaction Form */}
-          <div className="lg:col-span-4 xl:col-span-3 space-y-6">
-            <Card className="border-none shadow-md bg-white dark:bg-card">
+        {/* Summary Cards */}
+        <SummaryCards
+          totalBalance={totalBalance}
+          monthlyExpense={monthlyExpense}
+          savings={savings}
+        />
+
+        {/* Main Content Grid */}
+        <div className="grid gap-4 md:grid-cols-12">
+          {/* Left Column: Form */}
+          <div className="md:col-span-4 lg:col-span-3">
+            <Card>
               <CardHeader>
                 <CardTitle>Harcama Ekle</CardTitle>
-                <CardDescription>Yeni bir işlem kaydedin.</CardDescription>
+                <CardDescription>Yeni bir işlem kaydı oluşturun.</CardDescription>
               </CardHeader>
               <CardContent>
-                <TransactionForm onSubmit={async (data) => {
-                  await addTransaction(data)
-                }} />
+                <TransactionForm onSubmit={addTransaction} />
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column: Charts & Recent Transactions */}
-          <div className="lg:col-span-8 xl:col-span-9 space-y-8">
-
-            {/* Charts Row */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle>Kategori Dağılımı</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CategoryChart transactions={thisMonthTransactions} />
-                </CardContent>
-              </Card>
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle>Aylık Trend</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex items-center justify-center bg-slate-50 dark:bg-muted/20 rounded-md text-muted-foreground text-sm">
-                    (Çizgi Grafik Yakında)
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Transactions */}
-            <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Son İşlemler</CardTitle>
-                  <CardDescription>En son yapılan 5 işlem.</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <RecentTransactions
-                  transactions={transactions.slice(0, 5)}
-                  onDelete={deleteTransaction}
-                />
-              </CardContent>
-            </Card>
-
-          </div>
+           {/* Right Column: Charts & List */}
+           <div className="md:col-span-8 lg:col-span-9 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                   <CardHeader>
+                    <CardTitle>Kategori Dağılımı</CardTitle>
+                   </CardHeader>
+                   <CardContent>
+                    <CategoryChart transactions={transactions} />
+                   </CardContent>
+                </Card>
+                <Card>
+                   <CardHeader>
+                    <CardTitle>Son İşlemler</CardTitle>
+                   </CardHeader>
+                   <CardContent>
+                     {transactionsLoading ? (
+                       <div className="h-64 flex items-center justify-center">
+                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                       </div>
+                     ) : (
+                        <RecentTransactions transactions={transactions} onDelete={deleteTransaction} />
+                     )}
+                   </CardContent>
+                </Card>
+              </div>
+           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
