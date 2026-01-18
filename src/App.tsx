@@ -106,7 +106,7 @@ function App() {
 
           {/* Left Column: Transaction Form */}
           <div className="lg:col-span-4 xl:col-span-3 space-y-6">
-            <Card className="border-none shadow-md bg-white dark:bg-card">
+            <Card className="rounded-2xl border border-indigo-100 shadow-xl bg-white dark:bg-card/50 dark:border-indigo-900/20">
               <CardHeader>
                 <CardTitle>Harcama Ekle</CardTitle>
                 <CardDescription>Yeni bir işlem kaydedin.</CardDescription>
@@ -124,7 +124,7 @@ function App() {
 
             {/* Charts Row */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Card className="shadow-sm">
+              <Card className="rounded-2xl border border-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:border-slate-800">
                 <CardHeader>
                   <CardTitle>Kategori Dağılımı</CardTitle>
                 </CardHeader>
@@ -132,7 +132,7 @@ function App() {
                   <CategoryChart transactions={thisMonthTransactions} />
                 </CardContent>
               </Card>
-              <Card className="shadow-sm">
+              <Card className="rounded-2xl border border-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:border-slate-800">
                 <CardHeader>
                   <CardTitle>Aylık Trend</CardTitle>
                 </CardHeader>
@@ -145,7 +145,7 @@ function App() {
             </div>
 
             {/* Recent Transactions */}
-            <Card className="shadow-sm">
+            <Card className="rounded-2xl border border-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 dark:border-slate-800">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Son İşlemler</CardTitle>
