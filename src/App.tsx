@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, LayoutDashboard, User } from 'lucide-react'
+import { Bell, LayoutDashboard, User, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -8,11 +8,13 @@ import { RecentTransactions } from '@/components/dashboard/RecentTransactions'
 import { SummaryCards } from '@/components/dashboard/SummaryCards'
 import { CategoryChart } from '@/components/dashboard/CategoryChart'
 import { useTransactions } from '@/hooks/useTransactions'
+import { LoginForm } from '@/components/LoginForm'
 import { supabase } from '@/lib/supabase'
 
 function App() {
   const { transactions, addTransaction, deleteTransaction } = useTransactions()
   const [userEmail, setUserEmail] = useState<string>("")
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -21,6 +23,9 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email || "")
+      if (session?.user) {
+        setShowLoginModal(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -35,33 +40,6 @@ function App() {
   });
 
   const totalSpentThisMonth = thisMonthTransactions.reduce((acc, t) => acc + Number(t.amount), 0);
-
-  // Calculate percentage change (mock logic or real if we fetch last month)
-  // For MVP, letting it be simple or calculating if data exists
-  const lastMonthTransactions = transactions.filter(t => {
-    const d = new Date(t.date); // Simple check, handling month rollover logic is tedious in one line but essentially:
-    return (d.getMonth() === (currentMonth === 0 ? 11 : currentMonth - 1)) &&
-      (d.getFullYear() === (currentMonth === 0 ? currentYear - 1 : currentYear))
-  });
-  const totalSpentLastMonth = lastMonthTransactions.reduce((acc, t) => acc + Number(t.amount), 0);
-
-  // Calculate diff %
-  // Avoid division by zero
-  // 100 -> 120 (+20%)
-  // 0 -> 100 (+100% or infinite)
-  // 100 -> 50 (-50%)
-  let percentageChange = 0;
-  // Logic: ((Current - Last) / Last) * 100
-  // If Last is 0, and Current > 0, it's technically infinite increase, but let's show 100% or just amount.
-
-  // Top category
-  // Group by category, find max
-  const expensesByCategory: Record<string, number> = {};
-  thisMonthTransactions.forEach(t => {
-    expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + Number(t.amount);
-  });
-  const topCategoryEntry = Object.entries(expensesByCategory).sort((a, b) => b[1] - a[1])[0];
-  const topCategory = topCategoryEntry ? topCategoryEntry[0] : "-";
 
 
   return (
@@ -79,12 +57,29 @@ function App() {
             <Bell className="h-5 w-5" />
           </Button>
           <Separator orientation="vertical" className="h-6" />
-          <Button variant="ghost" size="sm" className="gap-2">
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
-              <User className="h-4 w-4" />
+          {userEmail ? (
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
+                <User className="h-4 w-4" />
+              </div>
+              <span className="hidden md:inline-block font-medium text-sm">{userEmail}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => supabase.auth.signOut()}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                Çıkış
+              </Button>
             </div>
-            <span className="hidden md:inline-block font-medium">{userEmail || "Misafir"}</span>
-          </Button>
+          ) : (
+            <Button variant="ghost" size="sm" className="gap-2">
+              <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
+                <User className="h-4 w-4" />
+              </div>
+              <span className="hidden md:inline-block font-medium">Misafir</span>
+            </Button>
+          )}
         </div>
       </header>
 
@@ -96,7 +91,7 @@ function App() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold tracking-tight">Genel Bakış</h2>
             {!userEmail && (
-              <Button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}>Giriş Yap</Button>
+              <Button onClick={() => setShowLoginModal(true)}>Giriş Yap</Button>
             )}
           </div>
           <SummaryCards
@@ -168,6 +163,23 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-md">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -top-2 -right-2 bg-white shadow-md hover:bg-slate-100"
+              onClick={() => setShowLoginModal(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <LoginForm onClose={() => setShowLoginModal(false)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

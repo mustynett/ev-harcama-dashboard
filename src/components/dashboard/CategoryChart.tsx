@@ -1,5 +1,5 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
-import { Transaction } from "@/lib/types"
+import type { Transaction } from "@/lib/types"
 
 interface CategoryChartProps {
     transactions: Transaction[]
@@ -41,7 +41,7 @@ export function CategoryChart({ transactions }: CategoryChartProps) {
                         paddingAngle={5}
                         dataKey="value"
                     >
-                        {data.map((entry, index) => (
+                        {data.map((_entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                     </Pie>
